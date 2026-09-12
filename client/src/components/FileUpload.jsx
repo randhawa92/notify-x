@@ -10,6 +10,12 @@ function FileUpload() {
   const [sending, setSending] = useState(false);
 
   // =========================
+  // Backend URL
+  // =========================
+
+  const API_URL = "https://notify-x-1.onrender.com";
+
+  // =========================
   // Upload Excel
   // =========================
 
@@ -25,17 +31,12 @@ function FileUpload() {
     const formData = new FormData();
 
     formData.append("file", file);
-
-    // Custom AI instruction
-    formData.append(
-      "prompt",
-      prompt
-    );
+    formData.append("prompt", prompt);
 
     try {
 
       const response = await fetch(
-        "http://127.0.0.1:5000/upload",
+        `${API_URL}/upload`,
         {
           method: "POST",
           body: formData,
@@ -50,9 +51,7 @@ function FileUpload() {
         );
       }
 
-      setStudents(
-        data.data || []
-      );
+      setStudents(data.data || []);
 
       alert(
         data.message ||
@@ -116,7 +115,7 @@ function FileUpload() {
     try {
 
       const response = await fetch(
-        "http://127.0.0.1:5000/send-whatsapp",
+        `${API_URL}/send-whatsapp`,
         {
           method: "POST",
 
@@ -131,8 +130,7 @@ function FileUpload() {
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(
@@ -141,9 +139,7 @@ function FileUpload() {
         );
       }
 
-      alert(
-        data.message
-      );
+      alert(data.message);
 
     } catch (error) {
 
@@ -181,7 +177,7 @@ function FileUpload() {
     try {
 
       const response = await fetch(
-        "http://127.0.0.1:5000/send-all",
+        `${API_URL}/send-all`,
         {
           method: "POST",
 
@@ -195,8 +191,7 @@ function FileUpload() {
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(
@@ -371,7 +366,7 @@ function FileUpload() {
                   );
 
                 // Hide phone-number columns
-                // from the visible data list
+                // from visible data
 
                 const visibleFields =
                   Object.entries(
