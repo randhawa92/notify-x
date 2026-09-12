@@ -1,0 +1,54 @@
+.status-section{
+    padding:100px 8%;
+}
+
+.status-title{
+    text-align:center;
+    margin-bottom:60px;
+}
+
+.status-title h2{
+    font-size:3rem;
+    margin-bottom:15px;
+}
+
+.status-title p{
+    color:#94a3b8;
+}
+
+.status-container{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:30px;
+}
+
+.status-card{
+    background:rgba(255,255,255,0.05);
+    backdrop-filter:blur(12px);
+
+    border:1px solid rgba(255,255,255,0.08);
+
+    border-radius:20px;
+
+    padding:35px;
+    text-align:center;
+}
+
+.status-number{
+    width:60px;
+    height:60px;
+
+    margin:auto;
+    margin-bottom:20px;
+
+    border-radius:50%;
+
+    background:#25D366;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    font-weight:700;
+    font-size:1.2rem;
+}
