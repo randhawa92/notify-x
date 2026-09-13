@@ -29,9 +29,9 @@ def start_whatsapp():
 
     # Already running
     if driver is not None:
-
         try:
             _ = driver.current_url
+            print("WhatsApp driver already running.")
             return True
 
         except Exception:
@@ -42,7 +42,19 @@ def start_whatsapp():
         options = Options()
 
         # -------------------------------------------------
-        # Dedicated NotifyX WhatsApp profile
+        # RENDER / LINUX COMPATIBILITY
+        # -------------------------------------------------
+
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--window-size=1920,1080")
+
+        # -------------------------------------------------
+        # WhatsApp profile
         # -------------------------------------------------
 
         profile_path = os.path.join(
@@ -59,12 +71,8 @@ def start_whatsapp():
             f"--user-data-dir={profile_path}"
         )
 
-        options.add_argument(
-            "--start-maximized"
-        )
-
         # -------------------------------------------------
-        # Start Chrome
+        # Chrome
         # -------------------------------------------------
 
         driver = webdriver.Chrome(
@@ -79,12 +87,10 @@ def start_whatsapp():
         print("        NOTIFYX WHATSAPP")
         print("======================================")
         print("WhatsApp Web opened.")
-        print("Scan QR if required.")
         print("Waiting for WhatsApp Web...")
         print("======================================\n")
 
-        # Small initial wait only
-        time.sleep(2)
+        time.sleep(5)
 
         return True
 
@@ -92,7 +98,7 @@ def start_whatsapp():
 
         print(
             "WhatsApp Start Error:",
-            e
+            repr(e)
         )
 
         driver = None
@@ -111,11 +117,11 @@ def normalize_phone(phone):
 
     phone = str(phone).strip()
 
-    # Excel may convert numbers to 1234567890.0
+    # Excel converts numbers to 1234567890.0
     if phone.endswith(".0"):
         phone = phone[:-2]
 
-    # Remove common formatting
+    # Remove formatting
     phone = (
         phone
         .replace(" ", "")
@@ -157,7 +163,7 @@ def is_driver_alive():
 # WAIT FOR WHATSAPP
 # =========================================================
 
-def wait_for_whatsapp(timeout=30):
+def wait_for_whatsapp(timeout=40):
 
     global driver
 
@@ -171,12 +177,13 @@ def wait_for_whatsapp(timeout=30):
             timeout
         )
 
-        # Wait until page body exists
         wait.until(
             EC.presence_of_element_located(
                 (By.TAG_NAME, "body")
             )
         )
+
+        print("WhatsApp page loaded.")
 
         return True
 
@@ -184,17 +191,17 @@ def wait_for_whatsapp(timeout=30):
 
         print(
             "WhatsApp Loading Error:",
-            e
+            repr(e)
         )
 
         return False
 
 
 # =========================================================
-# WAIT FOR CHAT PAGE
+# CHECK LOGIN STATUS
 # =========================================================
 
-def wait_for_chat(timeout=30):
+def check_whatsapp_login(timeout=10):
 
     global driver
 
@@ -208,22 +215,129 @@ def wait_for_chat(timeout=30):
             timeout
         )
 
-        # Wait until the URL is no longer just WhatsApp home
-        wait.until(
-            lambda d: "/send" in d.current_url
-            or "chat" in d.current_url
-            or "web.whatsapp.com" in d.current_url
+        # Chat list / search box normally appears after login
+        selectors = [
+            "//div[@contenteditable='true']",
+            "//div[@role='textbox']",
+            "//button[@aria-label='Search']",
+        ]
+
+        for selector in selectors:
+
+            try:
+
+                wait.until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, selector)
+                    )
+                )
+
+                print(
+                    "WhatsApp login/session appears active."
+                )
+
+                return True
+
+            except Exception:
+                continue
+
+        print(
+            "WhatsApp login/session not detected."
         )
 
-        return True
+        return False
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            "Login Check Error:",
+            repr(e)
+        )
 
         return False
 
 
 # =========================================================
-# SEND SINGLE WHATSAPP MESSAGE
+# OPEN CHAT
+# =========================================================
+
+def open_chat(phone, message):
+
+    global driver
+
+    encoded_message = urllib.parse.quote(
+        message
+    )
+
+    url = (
+        "https://web.whatsapp.com/send?"
+        f"phone={phone}"
+        f"&text={encoded_message}"
+    )
+
+    print(
+        f"Opening WhatsApp chat for {phone}"
+    )
+
+    driver.get(url)
+
+    time.sleep(3)
+
+    return wait_for_whatsapp(40)
+
+
+# =========================================================
+# FIND MESSAGE BOX
+# =========================================================
+
+def find_message_box(timeout=30):
+
+    global driver
+
+    if driver is None:
+        return None
+
+    wait = WebDriverWait(
+        driver,
+        timeout
+    )
+
+    selectors = [
+
+        # Current WhatsApp Web composer
+        "//div[@contenteditable='true']"
+        "[@data-tab]",
+
+        # Generic composer
+        "//div[@contenteditable='true']",
+
+        # Role textbox fallback
+        "//div[@role='textbox']"
+
+    ]
+
+    for selector in selectors:
+
+        try:
+
+            element = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, selector)
+                )
+            )
+
+            if element.is_displayed():
+
+                return element
+
+        except Exception:
+            continue
+
+    return None
+
+
+# =========================================================
+# SEND SINGLE MESSAGE
 # =========================================================
 
 def send_whatsapp(phone, message):
@@ -233,7 +347,7 @@ def send_whatsapp(phone, message):
     try:
 
         # -------------------------------------------------
-        # Validate phone
+        # PHONE
         # -------------------------------------------------
 
         phone = normalize_phone(phone)
@@ -241,40 +355,35 @@ def send_whatsapp(phone, message):
         if not phone:
 
             print(
-                "WhatsApp Error: "
-                "Phone number missing."
+                "WhatsApp Error: Phone number missing."
             )
 
             return False
 
         # -------------------------------------------------
-        # Validate message
+        # MESSAGE
         # -------------------------------------------------
 
         if message is None:
 
             print(
-                "WhatsApp Error: "
-                "Message missing."
+                "WhatsApp Error: Message missing."
             )
 
             return False
 
-        message = str(
-            message
-        ).strip()
+        message = str(message).strip()
 
         if not message:
 
             print(
-                "WhatsApp Error: "
-                "Message is empty."
+                "WhatsApp Error: Message is empty."
             )
 
             return False
 
         # -------------------------------------------------
-        # Start WhatsApp if required
+        # START DRIVER
         # -------------------------------------------------
 
         if not is_driver_alive():
@@ -282,111 +391,85 @@ def send_whatsapp(phone, message):
             driver = None
 
             if not start_whatsapp():
+
+                print(
+                    "Could not start WhatsApp driver."
+                )
+
                 return False
 
         # -------------------------------------------------
-        # Encode message
+        # OPEN WHATSAPP
         # -------------------------------------------------
 
-        encoded_message = urllib.parse.quote(
-            message
-        )
-
-        # -------------------------------------------------
-        # WhatsApp chat URL
-        # -------------------------------------------------
-
-        url = (
-            "https://web.whatsapp.com/send?"
-            f"phone={phone}"
-            f"&text={encoded_message}"
-        )
-
-        print("\n--------------------------------------")
-        print("NotifyX → WhatsApp")
-        print(f"Recipient: {phone}")
-        print("--------------------------------------")
-
-        # -------------------------------------------------
-        # Open chat
-        # -------------------------------------------------
-
-        driver.get(url)
-
-        # -------------------------------------------------
-        # Wait for WhatsApp page
-        # -------------------------------------------------
-
-        if not wait_for_whatsapp():
+        if not wait_for_whatsapp(40):
 
             print(
-                "Unable to load WhatsApp."
+                "WhatsApp Web did not load."
             )
 
             return False
 
         # -------------------------------------------------
-        # Wait for chat navigation
+        # OPEN CHAT
         # -------------------------------------------------
 
-        wait_for_chat()
+        if not open_chat(
+            phone,
+            message
+        ):
 
-        # -------------------------------------------------
-        # Find message composer
-        # -------------------------------------------------
-
-        wait = WebDriverWait(
-            driver,
-            20
-        )
-
-        composer = None
-
-        try:
-
-            composer = wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        "//div[@contenteditable='true']"
-                    )
-                )
+            print(
+                "Could not open WhatsApp chat."
             )
 
-        except Exception:
-
-            # Fallback: use body
-            try:
-
-                composer = driver.find_element(
-                    By.TAG_NAME,
-                    "body"
-                )
-
-            except Exception:
-
-                print(
-                    "Message composer not found."
-                )
-
-                return False
+            return False
 
         # -------------------------------------------------
-        # Send message
+        # CHECK SESSION
         # -------------------------------------------------
+
+        time.sleep(2)
+
+        # -------------------------------------------------
+        # FIND COMPOSER
+        # -------------------------------------------------
+
+        composer = find_message_box(
+            timeout=30
+        )
+
+        if composer is None:
+
+            print(
+                "Message composer not found."
+            )
+
+            print(
+                "Current URL:",
+                driver.current_url
+            )
+
+            return False
+
+        # -------------------------------------------------
+        # SEND
+        # -------------------------------------------------
+
+        composer.click()
+
+        time.sleep(0.5)
 
         composer.send_keys(
             Keys.ENTER
         )
 
-        # -------------------------------------------------
-        # Very small confirmation wait
-        # -------------------------------------------------
-
-        time.sleep(0.5)
+        # Give WhatsApp time to process
+        time.sleep(2)
 
         print(
-            "Message Sent Successfully ✅"
+            f"Message Sent Successfully ✅ "
+            f"→ {phone}"
         )
 
         return True
@@ -394,9 +477,8 @@ def send_whatsapp(phone, message):
     except Exception as e:
 
         print(
-            f"WhatsApp Send Error "
-            f"for {phone}:",
-            e
+            f"WhatsApp Send Error for {phone}:",
+            repr(e)
         )
 
         return False
@@ -428,7 +510,7 @@ def close_whatsapp():
 
         print(
             "WhatsApp Close Error:",
-            e
+            repr(e)
         )
 
         driver = None
