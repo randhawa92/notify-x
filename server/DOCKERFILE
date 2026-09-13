@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+# Install Chromium + ChromeDriver for Selenium
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Backend working directory
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy complete server folder
+COPY . .
+
+# Python logs immediately show in Render
+ENV PYTHONUNBUFFERED=1
+
+# Start Flask backend
+CMD gunicorn --bind 0.0.0.0:$PORT app:app
